@@ -1,0 +1,3 @@
+C:/Users/user/Documents/schedule-engine/build/CMakeFiles/schedule-engine.dir
+C:/Users/user/Documents/schedule-engine/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/user/Documents/schedule-engine/build/CMakeFiles/ZERO_CHECK.dir
