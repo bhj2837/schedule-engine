@@ -45,6 +45,11 @@ inline crow::response errorResponse(int code, const std::string& message) {
 // ───────────────────────────────────────────
 class TaskStore {
 public:
+
+    void clear() {
+    std::lock_guard<std::mutex> lock(mtx_);
+    tasks_.clear();
+}
     // 태스크 upsert (같은 id면 덮어쓰기)
     void upsert(const Task& task) {
         std::lock_guard<std::mutex> lock(mtx_);

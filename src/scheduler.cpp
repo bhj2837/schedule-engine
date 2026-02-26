@@ -146,6 +146,7 @@ bool Scheduler::optimize(const crow::json::rvalue& body,
 
     // 4) TaskStore에 upsert (POST /schedule 호출 시 자동 저장)
     auto& store = TaskStore::instance();
+    store.clear();
     for (auto& t : tasks) store.upsert(t);
 
     // 5) 응답 조립

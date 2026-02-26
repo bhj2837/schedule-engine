@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schedule Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0b0c0f;
+    --surface:  #13151a;
+    --border:   #1f2230;
+    --accent:   #00e5c0;
+    --accent2:  #ff4d6d;
+    --warn:     #ffb930;
+    --text:     #e0e4f0;
+    --muted:    #5a607a;
+    --mono:     'Space Mono', monospace;
+    --sans:     'Syne', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Background grid ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,192,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,192,.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 1280px; margin: 0 auto; padding: 0 32px; }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 0;
+    margin-bottom: 48px;
+  }
+  header .inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-dot {
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,229,192,.4); }
+    50%      { opacity: .6; box-shadow: 0 0 0 6px rgba(0,229,192,0); }
+  }
+  .status-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: .08em;
+  }
+  .status-badge span { color: var(--accent); }
+
+  /* ── Main grid ── */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 420px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── Panel ── */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .panel-head {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .panel-title strong { color: var(--text); }
+  .panel-body { padding: 20px; }
+
+  /* ── Form ── */
+  .field-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field.full { grid-column: 1 / -1; }
+  label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  input, select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 11px;
+    font-family: var(--mono);
+    font-size: 13px;
+    border-radius: 2px;
+    outline: none;
+    transition: border-color .15s;
+    width: 100%;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+
+  /* ── Task rows ── */
+  .tasks-container { display: flex; flex-direction: column; gap: 10px; }
+  .task-row {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 14px;
+    position: relative;
+    animation: slideIn .2s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .task-row-num {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: .1em;
+    margin-bottom: 10px;
+  }
+  .task-row-grid {
+    display: grid;
+    grid-template-columns: 1fr 60px 60px;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .task-row-grid2 {
+    display: grid;
+    grid-template-columns: 1fr 40px;
+    gap: 8px;
+    align-items: end;
+  }
+  .btn-remove {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    width: 32px; height: 32px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .15s;
+    flex-shrink: 0;
+  }
+  .btn-remove:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* ── Buttons ── */
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 11px 20px;
+    border-radius: 2px;
+    cursor: pointer;
+    border: none;
+    transition: all .15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--bg);
+    flex: 1;
+    justify-content: center;
+  }
+  .btn-primary:hover { background: #00ffd4; }
+  .btn-primary:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+  .btn-secondary {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Right panel ── */
+  .right-col { display: flex; flex-direction: column; gap: 24px; }
+
+  /* ── Gantt ── */
+  #gantt-wrap { min-height: 200px; }
+  .gantt-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .05em;
+    text-align: center;
+  }
+  .gantt-empty svg { opacity: .2; }
+
+  .gantt-axis {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+    padding-bottom: 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    position: relative;
+    height: 20px;
+    overflow: hidden;
+  }
+  .gantt-axis-tick {
+    position: absolute;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+  .gantt-rows { display: flex; flex-direction: column; gap: 10px; }
+  .gantt-row { display: flex; align-items: center; gap: 12px; }
+  .gantt-label {
+    width: 130px;
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+  }
+  .gantt-track {
+    flex: 1;
+    height: 28px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    position: relative;
+    overflow: hidden;
+  }
+  .gantt-bar {
+    position: absolute;
+    top: 3px;
+    height: 22px;
+    border-radius: 1px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: width .4s cubic-bezier(.4,0,.2,1), left .4s cubic-bezier(.4,0,.2,1);
+  }
+  .gantt-bar.ok    { background: rgba(0,229,192,.25); color: var(--accent); border-left: 2px solid var(--accent); }
+  .gantt-bar.warn  { background: rgba(255,185,48,.2); color: var(--warn);   border-left: 2px solid var(--warn); }
+  .deadline-marker {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 1px;
+    background: var(--accent2);
+    opacity: .5;
+  }
+  .deadline-marker::before {
+    content: '⏱';
+    position: absolute;
+    top: -1px;
+    left: 3px;
+    font-size: 9px;
+    color: var(--accent2);
+  }
+
+  /* ── Stats row ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+  .stat-cell {
+    background: var(--surface);
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .stat-val {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    display: block;
+  }
+  .stat-val.danger { color: var(--accent2); }
+  .stat-val.warn   { color: var(--warn); }
+  .stat-lbl {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-top: 2px;
+  }
+
+  /* ── Task list ── */
+  .task-list-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    animation: fadeIn .3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .task-list-item:last-child { border-bottom: none; }
+  .task-id {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    width: 28px;
+    flex-shrink: 0;
+  }
+  .task-name { flex: 1; font-weight: 600; font-size: 13px; }
+  .task-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    display: flex;
+    gap: 8px;
+  }
+  .prio-pip {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+
+  /* ── Error toast ── */
+  #toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--accent2);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 12px 24px;
+    border-radius: 2px;
+    opacity: 0;
+    transition: all .25s;
+    z-index: 100;
+    max-width: 480px;
+    text-align: center;
+    pointer-events: none;
+  }
+  #toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ── Loading spinner ── */
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    display: none;
+  }
+  .loading .spinner { display: inline-block; }
+  .loading .btn-text { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  select option { background: var(--surface); }
+
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+  .section-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="inner">
+      <div class="logo">
+        <div class="logo-dot"></div>
+        SCHEDULE&#8202;ENGINE
+      </div>
+      <div class="status-badge">
+        PORT <span>8080</span> &nbsp;/&nbsp; EDF + PRIORITY&#8202;WEIGHTED
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="main-grid">
+
+    <!-- ── LEFT: Input Panel ── -->
+    <div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><strong>TASK INPUT</strong></div>
+          <div class="panel-title" id="task-count-label">0 tasks</div>
+        </div>
+        <div class="panel-body">
+
+          <!-- Global available_start -->
+          <div class="field" style="margin-bottom:16px">
+            <label>Available Start (optional, ISO datetime)</label>
+            <input type="text" id="available-start" placeholder="e.g. 2025-07-01T09:00:00">
+          </div>
+          <div class="divider"></div>
+
+          <!-- Dynamic task rows -->
+          <div class="tasks-container" id="tasks-container"></div>
+
+          <button class="btn btn-secondary" style="width:100%;margin-top:12px;justify-content:center" onclick="addTaskRow()">
+            + Add Task
+          </button>
+
+          <div class="btn-row">
+            <button class="btn btn-primary" id="run-btn" onclick="runSchedule()">
+              <span class="btn-text">▶ Run Schedule</span>
+              <span class="spinner"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RIGHT: Output ── -->
+    <div class="right-col">
+
+      <!-- Stats -->
+      <div class="stats-row" id="stats-row" style="display:none">
+        <div class="stat-cell">
+          <span class="stat-val" id="stat-total">0</span>
+          <span class="stat-lbl">Total Tasks</span>
+        </div>
+        <div class="stat-cell">
+          <span class="stat-val warn" id="stat-warn">0</span>
+          <span class="stat-lbl">Deadline Risk</span>
+        </div>
+        <div class="stat-cell">
+          <span class="stat-val" id="stat-span">—</span>
+          <span class="stat-lbl">Total Duration</span>
+        </div>
+      </div>
+
+      <!-- Gantt Chart -->
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><strong>SCHEDULE</strong> / TIMELINE</div>
+          <div class="panel-title" id="gantt-meta"></div>
+        </div>
+        <div class="panel-body">
+          <div id="gantt-wrap">
+            <div class="gantt-empty">
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                <rect x="8" y="14" width="22" height="5" rx="1" fill="currentColor"/>
+                <rect x="14" y="24" width="18" height="5" rx="1" fill="currentColor"/>
+                <rect x="10" y="34" width="26" height="5" rx="1" fill="currentColor"/>
+              </svg>
+              Run the scheduler to see your timeline
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stored Tasks -->
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><strong>STORED TASKS</strong> / GET /tasks</div>
+          <button class="btn btn-secondary" style="padding:5px 12px;font-size:10px" onclick="loadTasks()">Refresh</button>
+        </div>
+        <div class="panel-body">
+          <div id="task-list">
+            <div class="gantt-empty" style="padding:30px 20px">No stored tasks yet</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let taskCounter = 0;
+const priorities = [1,2,3,4,5,6,7,8,9,10];
+const prioColors = {
+  1:'#5a607a',2:'#6b7280',3:'#7c8a9e',4:'#3b82f6',5:'#6366f1',
+  6:'#8b5cf6',7:'#a855f7',8:'#ffb930',9:'#f97316',10:'#ff4d6d'
+};
+
+function prioColor(p) { return prioColors[p] || '#5a607a'; }
+
+function addTaskRow(defaults = {}) {
+  taskCounter++;
+  const id = taskCounter;
+  const container = document.getElementById('tasks-container');
+
+  const now = new Date();
+  const tomorrow = new Date(now.getTime() + 24*3600*1000);
+  const defaultDeadline = defaults.deadline_str || formatDatetimeLocal(tomorrow);
+  const defaultDuration = defaults.duration_min || 30;
+  const defaultPriority = defaults.priority || 5;
+  const defaultName     = defaults.title || '';
+
+  const div = document.createElement('div');
+  div.className = 'task-row';
+  div.id = `task-row-${id}`;
+  div.innerHTML = `
+    <div class="task-row-num">TASK #${id}</div>
+    <div class="task-row-grid">
+      <div class="field">
+        <label>Name</label>
+        <input type="text" placeholder="e.g. Write report" value="${defaultName}" class="t-name" data-id="${id}">
+      </div>
+      <div class="field">
+        <label>Duration (min)</label>
+        <input type="number" min="1" value="${defaultDuration}" class="t-dur" data-id="${id}">
+      </div>
+      <div class="field">
+        <label>Priority</label>
+        <select class="t-pri" data-id="${id}">
+          ${priorities.map(p=>`<option value="${p}" ${p==defaultPriority?'selected':''}>${p}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="task-row-grid2">
+      <div class="field full">
+        <label>Deadline (YYYY-MM-DDTHH:MM:SS)</label>
+        <input type="datetime-local" class="t-dl" data-id="${id}" value="${toDatetimeLocalValue(defaultDeadline)}">
+      </div>
+      <button class="btn-remove" onclick="removeTaskRow(${id})">×</button>
+    </div>
+  `;
+  container.appendChild(div);
+  updateTaskCount();
+}
+
+function removeTaskRow(id) {
+  const el = document.getElementById(`task-row-${id}`);
+  if (el) el.remove();
+  updateTaskCount();
+}
+
+function updateTaskCount() {
+  const count = document.querySelectorAll('.task-row').length;
+  document.getElementById('task-count-label').textContent = `${count} task${count!==1?'s':''}`;
+}
+
+function formatDatetimeLocal(d) {
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+function toDatetimeLocalValue(s) {
+  // datetime-local doesn't show seconds natively but accepts it
+  return s.slice(0,16);
+}
+function fromDatetimeLocal(val) {
+  return val.length === 16 ? val + ':00' : val;
+}
+
+function collectTasks() {
+  const rows = document.querySelectorAll('.task-row');
+  const tasks = [];
+  let i = 1;
+  for (const row of rows) {
+    const id_attr = row.id.replace('task-row-', '');
+    const name = row.querySelector('.t-name').value.trim();
+    const dur  = parseInt(row.querySelector('.t-dur').value);
+    const pri  = parseInt(row.querySelector('.t-pri').value);
+    const dl_val = row.querySelector('.t-dl').value;
+    const dl   = fromDatetimeLocal(dl_val);
+    tasks.push({ id: i++, name, duration: dur, priority: pri, deadline: dl });
+  }
+  return tasks;
+}
+
+async function runSchedule() {
+  const btn = document.getElementById('run-btn');
+  const tasks = collectTasks();
+  if (tasks.length === 0) { showToast('Add at least one task'); return; }
+
+  const avs = document.getElementById('available-start').value.trim();
+  const body = { tasks };
+  if (avs) {
+    body.available_start = Math.floor(new Date(avs).getTime() / 1000);
+  }
+
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!res.ok || data.status === 'error') {
+      showToast(data.message || 'Request failed');
+      return;
+    }
+    renderGantt(data.schedule, tasks);
+    await loadTasks();
+  } catch(e) {
+    showToast('Connection error – is the server running?');
+  } finally {
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
+
+function renderGantt(schedule, inputTasks) {
+  if (!schedule || schedule.length === 0) return;
+
+  // Build deadline lookup from input
+  const deadlineMap = {};
+  inputTasks.forEach(t => {
+    deadlineMap[t.name] = Math.floor(new Date(t.deadline).getTime() / 1000);
+  });
+
+  const minT = Math.min(...schedule.map(b => b.start_time));
+  const maxT = Math.max(...schedule.map(b => b.end_time));
+  const span = maxT - minT;
+
+  // Count deadline risks
+  let warnCount = 0;
+  schedule.forEach(b => {
+    const dl = deadlineMap[b.title];
+    if (dl && b.end_time > dl) warnCount++;
+  });
+
+  const totalMin = Math.round(span / 60);
+  const totalHr  = totalMin >= 60 ? `${(totalMin/60).toFixed(1)}h` : `${totalMin}m`;
+
+  // Stats
+  document.getElementById('stats-row').style.display = '';
+  document.getElementById('stat-total').textContent = schedule.length;
+  document.getElementById('stat-warn').textContent  = warnCount;
+  const warnEl = document.getElementById('stat-warn');
+  warnEl.className = 'stat-val' + (warnCount > 0 ? ' danger' : '');
+  document.getElementById('stat-span').textContent  = totalHr;
+
+  // Build axis ticks
+  const tickCount = Math.min(6, schedule.length + 1);
+  let axisTicks = '';
+  for (let i = 0; i <= tickCount; i++) {
+    const t = minT + (span * i / tickCount);
+    const pct = ((t - minT) / span * 100).toFixed(1);
+    const label = formatTime(t);
+    axisTicks += `<div class="gantt-axis-tick" style="left:${pct}%">${label}</div>`;
+  }
+
+  // Build rows
+  let rowsHtml = '';
+  schedule.forEach(b => {
+    const leftPct  = ((b.start_time - minT) / span * 100).toFixed(2);
+    const widthPct = ((b.end_time - b.start_time) / span * 100).toFixed(2);
+    const dl       = deadlineMap[b.title];
+    const isWarn   = dl && b.end_time > dl;
+    const barClass = isWarn ? 'warn' : 'ok';
+
+    let deadlineMarker = '';
+    if (dl && dl >= minT && dl <= maxT) {
+      const dlPct = ((dl - minT) / span * 100).toFixed(2);
+      deadlineMarker = `<div class="deadline-marker" style="left:${dlPct}%"></div>`;
+    }
+
+    const durationStr = Math.round((b.end_time - b.start_time) / 60) + 'm';
+    const warnIcon = isWarn ? ' ⚠' : '';
+
+    rowsHtml += `
+      <div class="gantt-row">
+        <div class="gantt-label" title="${b.title}">P${b.priority} · ${b.title}</div>
+        <div class="gantt-track">
+          ${deadlineMarker}
+          <div class="gantt-bar ${barClass}" style="left:${leftPct}%;width:${widthPct}%" title="${b.title}: ${durationStr}${isWarn?' (DEADLINE MISSED!)':''}">
+            ${parseFloat(widthPct) > 8 ? durationStr + warnIcon : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  document.getElementById('gantt-wrap').innerHTML = `
+    <div class="gantt-axis">${axisTicks}</div>
+    <div class="gantt-rows">${rowsHtml}</div>
+    ${warnCount > 0 ? `<div style="margin-top:14px;padding:10px 14px;background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.3);border-radius:2px;font-family:var(--mono);font-size:11px;color:var(--accent2)">⚠ ${warnCount} task${warnCount>1?'s':''} may miss deadline — consider rescheduling or raising priority</div>` : ''}
+  `;
+
+  document.getElementById('gantt-meta').textContent =
+    `${formatTime(minT)} → ${formatTime(maxT)}`;
+}
+
+async function loadTasks() {
+  try {
+    const res = await fetch('/tasks');
+    const data = await res.json();
+    const el = document.getElementById('task-list');
+    if (!data.tasks || data.tasks.length === 0) {
+      el.innerHTML = '<div class="gantt-empty" style="padding:30px 20px">No stored tasks yet</div>';
+      return;
+    }
+    el.innerHTML = data.tasks.map(t => {
+      const dl = new Date(t.deadline * 1000);
+      const dlStr = dl.toLocaleDateString() + ' ' + dl.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      return `
+        <div class="task-list-item">
+          <div class="prio-pip" style="background:${prioColor(t.priority)}"></div>
+          <div class="task-id">#${t.id}</div>
+          <div class="task-name">${t.name}</div>
+          <div class="task-meta">
+            <span>${t.duration_min}m</span>
+            <span>P${t.priority}</span>
+            <span>${dlStr}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch(e) {
+    // silent
+  }
+}
+
+function formatTime(unix) {
+  const d = new Date(unix * 1000);
+  return d.getHours().toString().padStart(2,'0') + ':' +
+         d.getMinutes().toString().padStart(2,'0');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+// Init
+addTaskRow({ title: 'Design review',    duration_min: 60, priority: 8 });
+addTaskRow({ title: 'Write unit tests',  duration_min: 45, priority: 5 });
+addTaskRow({ title: 'Deploy to staging', duration_min: 30, priority: 9 });
+loadTasks();
+</script>
+</body>
+</html>
